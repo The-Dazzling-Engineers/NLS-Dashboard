@@ -1164,7 +1164,17 @@ ${lines}
     }).join('')}</div>`;
   }
 
-  function removeRep(idx) {
+  async function removeRep(idx) {
+    const entry = leaderboardData[idx];
+    try {
+      await fetch(`${BACKEND}/sheet`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rep: entry.rep, timestamp: entry.time })
+      });
+    } catch (err) {
+      console.warn('Could not delete from sheet:', err.message);
+    }
     leaderboardData.splice(idx, 1);
     saveLeaderboard();
     updateBoardCount();
