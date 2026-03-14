@@ -996,6 +996,7 @@
       lastResult = { rep, outcome, timestamp: new Date().toLocaleString(), ...data };
       renderResults(lastResult);
       addToLeaderboard(lastResult);
+      logToSheet();
     } catch (err) {
       showToast('Error: ' + err.message, 'error');
     } finally {
