@@ -30,7 +30,7 @@ router.post('/', async (req, res) => {
     });
 
     // Write scores cache for OpenClaw to read
-    const scoresPath = '/root/scores.json';
+    const scoresPath = '/root/.openclaw/workspace/scores.json';
     let scores = [];
     if (fs.existsSync(scoresPath)) {
       scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
