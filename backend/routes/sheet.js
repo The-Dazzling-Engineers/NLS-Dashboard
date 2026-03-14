@@ -1,6 +1,7 @@
 const express = require('express');
 const { google } = require('googleapis');
 const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -27,6 +28,15 @@ router.post('/', async (req, res) => {
         values: [[rep, score, timestamp]],
       },
     });
+
+    // Write scores cache for OpenClaw to read
+    const scoresPath = '/root/scores.json';
+    let scores = [];
+    if (fs.existsSync(scoresPath)) {
+      scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
+    }
+    scores.push({ rep, score, timestamp });
+    fs.writeFileSync(scoresPath, JSON.stringify(scores, null, 2));
 
     res.json({ success: true });
   } catch (err) {
