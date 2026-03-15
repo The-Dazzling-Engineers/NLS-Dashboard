@@ -47,9 +47,38 @@ function getScores() {
 
 function formatLeaderboard(scores) {
   if (!scores.length) return 'No scores logged yet.';
-  const sorted = [...scores].sort((a, b) => b.score - a.score);
-  const lines = sorted.map((s, i) => `${i + 1}. ${s.rep} - ${s.score}`);
-  return `NLS Leaderboard\n\n${lines.join('\n')}`;
+
+  // Group by rep
+  const groups = {};
+  scores.forEach(s => {
+    const key = s.rep.toLowerCase();
+    if (!groups[key]) groups[key] = { rep: s.rep, scores: [], outcomes: {} };
+    groups[key].scores.push(s.score);
+    const o = s.outcome || 'no_sale';
+    groups[key].outcomes[o] = (groups[key].outcomes[o] || 0) + 1;
+  });
+
+  const reps = Object.values(groups).map(g => ({
+    rep: g.rep,
+    avg: Math.round(g.scores.reduce((a, b) => a + b, 0) / g.scores.length),
+    calls: g.scores.length,
+    outcomes: g.outcomes,
+  })).sort((a, b) => b.avg - a.avg);
+
+  const medals = ['🥇', '🥈', '🥉'];
+  const lines = reps.map((r, i) => {
+    const rank = medals[i] || `${i + 1}.`;
+    const outcomeStr = Object.entries(r.outcomes)
+      .map(([k, v]) => `${v} ${k.replace('_', ' ')}`)
+      .join(', ');
+    return `${rank} ${r.rep} — ${r.avg}/100 (${r.calls} call${r.calls > 1 ? 's' : ''}: ${outcomeStr})`;
+  });
+
+  const total = scores.length;
+  const closes = scores.filter(s => s.outcome === 'closed').length;
+  const avgAll = Math.round(scores.reduce((a, s) => a + s.score, 0) / total);
+
+  return `🏆 NLS Leaderboard\n\n${lines.join('\n')}\n\n📊 ${total} calls · ${closes} closes · ${avgAll} avg score`;
 }
 
 async function sendToChat(chatId, text) {
