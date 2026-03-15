@@ -84,39 +84,33 @@ async function sendLeaderboard(chatId) {
   await sendToChat(target, message);
 }
 
-function startPolling() {
-  let offset = 0;
+async function handleUpdate(update) {
+  const msg = update.message;
+  if (!msg || !msg.text) return;
 
-  async function poll() {
-    try {
-      const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUpdates?timeout=30&offset=${offset}`;
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (data.ok && data.result.length) {
-        for (const update of data.result) {
-          offset = update.update_id + 1;
-          const msg = update.message;
-          if (!msg || !msg.text) continue;
-
-          const text = msg.text.toLowerCase().trim();
-          const keywords = ['leaderboard', 'scores', 'rankings', 'eod'];
-          if (keywords.some(kw => text.includes(kw))) {
-            await sendLeaderboard(msg.chat.id);
-          } else {
-            const reply = await askClaude(msg.text);
-            await sendToChat(msg.chat.id, reply);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('polling error:', err.message);
+  const text = msg.text.toLowerCase().trim();
+  const keywords = ['leaderboard', 'scores', 'rankings', 'eod'];
+  try {
+    if (keywords.some(kw => text.includes(kw))) {
+      await sendLeaderboard(msg.chat.id);
+    } else {
+      const reply = await askClaude(msg.text);
+      await sendToChat(msg.chat.id, reply);
     }
-    setTimeout(poll, 1000);
+  } catch (err) {
+    console.error('handleUpdate error:', err.message);
   }
+}
 
-  poll();
-  console.log('Telegram bot polling started');
+async function registerWebhook(tunnelUrl) {
+  const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: `${tunnelUrl}/bot` }),
+  });
+  const data = await res.json();
+  console.log('Webhook registered:', data.description);
 }
 
 function scheduleEOD() {
@@ -127,4 +121,4 @@ function scheduleEOD() {
   console.log('EOD report scheduled for 11:59pm EST');
 }
 
-module.exports = { startPolling, scheduleEOD };
+module.exports = { handleUpdate, registerWebhook, scheduleEOD };
