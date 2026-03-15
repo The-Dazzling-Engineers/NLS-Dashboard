@@ -1077,7 +1077,7 @@ ${lines}
       const res = await fetch(`${BACKEND}/sheet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rep: lastResult.rep, score: lastResult.overall, timestamp: lastResult.timestamp })
+        body: JSON.stringify({ rep: lastResult.rep, score: lastResult.overall, timestamp: lastResult.timestamp, outcome: lastResult.outcome })
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       showToast('Logged to Google Sheets ✓', 'success');
@@ -1192,7 +1192,7 @@ ${lines}
         await fetch(`${BACKEND}/sheet`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rep: entry.rep, timestamp: entry.time })
+          body: JSON.stringify({ rep: repName })
         });
       } catch (err) {
         console.warn('Could not delete from sheet:', err.message);
