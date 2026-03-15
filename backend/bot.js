@@ -1,5 +1,3 @@
-const { google } = require('googleapis');
-const path = require('path');
 const cron = require('node-cron');
 const Anthropic = require('@anthropic-ai/sdk');
 
@@ -44,21 +42,12 @@ async function askClaude(userMessage) {
   return response.content[0].text;
 }
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, 'google-credentials.json'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-});
+const fs = require('fs');
+const SCORES_PATH = '/root/.openclaw/workspace/scores.json';
 
-async function getScores() {
-  const sheets = google.sheets({ version: 'v4', auth });
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-    range: 'Sheet1!A:C',
-  });
-  const rows = response.data.values || [];
-  return rows
-    .filter(row => row[0] && row[1])
-    .map(row => ({ rep: row[0], score: parseInt(row[1]), timestamp: row[2] || '' }));
+function getScores() {
+  if (!fs.existsSync(SCORES_PATH)) return [];
+  return JSON.parse(fs.readFileSync(SCORES_PATH, 'utf8'));
 }
 
 function formatLeaderboard(scores) {
