@@ -23,10 +23,22 @@ Business metrics to know:
 Anyone scoring below 60 needs mandatory coaching review.`;
 
 async function askClaude(userMessage) {
+  let systemWithData = SYSTEM_PROMPT;
+  try {
+    const scores = await getScores();
+    if (scores.length) {
+      const sorted = [...scores].sort((a, b) => b.score - a.score);
+      const lines = sorted.map((s, i) => `${i + 1}. ${s.rep} - ${s.score} (${s.timestamp})`).join('\n');
+      systemWithData += `\n\nCurrent leaderboard data:\n${lines}`;
+    }
+  } catch (err) {
+    // proceed without scores if fetch fails
+  }
+
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 500,
-    system: SYSTEM_PROMPT,
+    system: systemWithData,
     messages: [{ role: 'user', content: userMessage }],
   });
   return response.content[0].text;
