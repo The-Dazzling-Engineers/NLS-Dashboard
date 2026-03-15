@@ -1,6 +1,36 @@
 const { google } = require('googleapis');
 const path = require('path');
 const cron = require('node-cron');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const SYSTEM_PROMPT = `You are an AI assistant for Next Level Systems (NLS), a company that helps people with ADHD build multi-million dollar businesses. You work for Ali, the owner.
+
+Your job:
+- Help manage Ali's sales team
+- Answer questions about call performance, reps, and scores
+- Draft messages in Ali's voice — direct, warm, no fluff
+- Be concise. No filler. No "Great question!"
+
+Business metrics to know:
+- L = Leads (goal: 50/day)
+- OB = Offer Breaks / calls booked (goal: 36/day)
+- CL = Closes (goal: 18/day)
+- Close rate goal: 50%
+- Daily revenue target: $20k
+
+Anyone scoring below 60 needs mandatory coaching review.`;
+
+async function askClaude(userMessage) {
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 500,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userMessage }],
+  });
+  return response.content[0].text;
+}
 
 const auth = new google.auth.GoogleAuth({
   keyFile: path.join(__dirname, 'google-credentials.json'),
@@ -61,6 +91,9 @@ function startPolling() {
           const keywords = ['leaderboard', 'scores', 'rankings', 'eod'];
           if (keywords.some(kw => text.includes(kw))) {
             await sendLeaderboard(msg.chat.id);
+          } else {
+            const reply = await askClaude(msg.text);
+            await sendToChat(msg.chat.id, reply);
           }
         }
       }
