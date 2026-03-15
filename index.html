@@ -872,7 +872,7 @@
 
   <!-- Manual add -->
   <div class="eod-top">
-    <input type="text" id="eodRep" placeholder="Rep name" />
+    <input type="text" id="eodRep" placeholder="First and last name" />
     <input type="text" id="eodScore" placeholder="Score (0–100)" style="max-width:130px;" />
     <select id="eodOutcome" style="max-width:160px;">
       <option value="">Outcome…</option>
@@ -1098,7 +1098,14 @@ ${lines}
     const score   = parseInt(document.getElementById('eodScore').value);
     const outcome = document.getElementById('eodOutcome').value;
     if (!rep || isNaN(score)) { showToast('Enter rep name and score', 'error'); return; }
-    leaderboardData.push({ rep, score, outcome: outcome || 'no_sale', criteria: [], time: new Date().toLocaleString() });
+    const existing = leaderboardData.findIndex(r => r.rep.toLowerCase() === rep.toLowerCase());
+    if (existing !== -1) {
+      leaderboardData[existing].score = score;
+      leaderboardData[existing].outcome = outcome || leaderboardData[existing].outcome;
+      leaderboardData[existing].time = new Date().toLocaleString();
+    } else {
+      leaderboardData.push({ rep, score, outcome: outcome || 'no_sale', criteria: [], time: new Date().toLocaleString() });
+    }
     saveLeaderboard();
     updateBoardCount();
     renderLeaderboard();
