@@ -1,33 +1,13 @@
 const express = require('express');
-const { google } = require('googleapis');
-const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
+const SCORES_PATH = '/root/.openclaw/workspace/scores.json';
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, '..', 'google-credentials.json'),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-});
-
-router.get('/', async (req, res) => {
+router.get('/', (req, res) => {
   try {
-    const sheets = google.sheets({ version: 'v4', auth });
-
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-      range: 'Sheet1!A:C',
-    });
-
-    const rows = response.data.values || [];
-
-    const scores = rows
-      .filter(row => row[0] && row[1])
-      .map(row => ({
-        rep: row[0],
-        score: parseInt(row[1]),
-        timestamp: row[2] || '',
-      }));
-
+    if (!fs.existsSync(SCORES_PATH)) return res.json([]);
+    const scores = JSON.parse(fs.readFileSync(SCORES_PATH, 'utf8'));
     res.json(scores);
   } catch (err) {
     console.error('scores error:', err);
