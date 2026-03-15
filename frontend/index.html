@@ -1156,6 +1156,10 @@ ${lines}
       rep: g.rep,
       avgScore: Math.round(g.entries.reduce((a, e) => a + e.score, 0) / g.entries.length),
       callCount: g.entries.length,
+      closed: g.entries.filter(e => e.outcome === 'closed').length,
+      noSale: g.entries.filter(e => e.outcome === 'no_sale').length,
+      noShow: g.entries.filter(e => e.outcome === 'no_show').length,
+      followUp: g.entries.filter(e => e.outcome === 'follow_up').length,
       outcome: g.entries[g.entries.length - 1].outcome,
       criteria: g.entries[g.entries.length - 1].criteria || [],
       time: g.entries[g.entries.length - 1].time || '',
@@ -1198,7 +1202,12 @@ ${lines}
             <div class="lb-time">${r.time || ''}</div>
           </div>
           <div class="score-badge ${colorCls(r.avgScore)}">${r.avgScore}</div>
-          <span class="outcome-tag tag-${r.outcome}">${formatOutcome(r.outcome)}</span>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            ${r.closed  ? `<span class="outcome-tag tag-closed">${r.closed} Close${r.closed > 1 ? 's' : ''}</span>` : ''}
+            ${r.noSale  ? `<span class="outcome-tag tag-no_sale">${r.noSale} No Sale${r.noSale > 1 ? 's' : ''}</span>` : ''}
+            ${r.noShow  ? `<span class="outcome-tag tag-no_show">${r.noShow} No Show${r.noShow > 1 ? 's' : ''}</span>` : ''}
+            ${r.followUp ? `<span class="outcome-tag tag-follow_up">${r.followUp} Follow Up${r.followUp > 1 ? 's' : ''}</span>` : ''}
+          </div>
           ${miniHtml}
           <button class="lb-remove" onclick="removeRep('${r.rep}')">✕</button>
         </div>`;
