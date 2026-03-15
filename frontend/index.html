@@ -1123,21 +1123,36 @@ ${lines}
   function renderLeaderboard() {
     const list = document.getElementById('leaderboardList');
 
-    // Stats
-    if (leaderboardData.length) {
-      const avg  = Math.round(leaderboardData.reduce((a, r) => a + r.score, 0) / leaderboardData.length);
-      const top  = [...leaderboardData].sort((a, b) => b.score - a.score)[0];
-      document.getElementById('statTotal').textContent = leaderboardData.length;
-      document.getElementById('statAvg').textContent   = avg;
-      document.getElementById('statTop').textContent   = top.rep;
-    }
-
     if (!leaderboardData.length) {
       list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>No reps logged yet.</p></div>`;
       return;
     }
 
-    const sorted = [...leaderboardData].sort((a, b) => b.score - a.score);
+    // Group by rep name (case-insensitive)
+    const groups = {};
+    leaderboardData.forEach(r => {
+      const key = r.rep.toLowerCase();
+      if (!groups[key]) groups[key] = { rep: r.rep, entries: [] };
+      groups[key].entries.push(r);
+    });
+
+    const grouped = Object.values(groups).map(g => ({
+      rep: g.rep,
+      avgScore: Math.round(g.entries.reduce((a, e) => a + e.score, 0) / g.entries.length),
+      callCount: g.entries.length,
+      outcome: g.entries[g.entries.length - 1].outcome,
+      criteria: g.entries[g.entries.length - 1].criteria || [],
+      time: g.entries[g.entries.length - 1].time || '',
+    }));
+
+    // Stats
+    const avg = Math.round(grouped.reduce((a, r) => a + r.avgScore, 0) / grouped.length);
+    const top = [...grouped].sort((a, b) => b.avgScore - a.avgScore)[0];
+    document.getElementById('statTotal').textContent = leaderboardData.length;
+    document.getElementById('statAvg').textContent   = avg;
+    document.getElementById('statTop').textContent   = top.rep;
+
+    const sorted = [...grouped].sort((a, b) => b.avgScore - a.avgScore);
 
     list.innerHTML = `<div class="lb-list">${sorted.map((r, i) => {
       const rank  = i + 1;
@@ -1155,35 +1170,35 @@ ${lines}
           }).join('')}</div>`
         : `<span style="color:var(--border2);font-size:12px">—</span>`;
 
-      const origIdx = leaderboardData.indexOf(r);
-
       return `
         <div class="lb-row${topCls}">
           ${rankHtml}
           <div>
-            <div class="lb-name">${r.rep}</div>
+            <div class="lb-name">${r.rep} <span style="font-size:11px;color:var(--text2)">(${r.callCount} call${r.callCount > 1 ? 's' : ''})</span></div>
             <div class="lb-time">${r.time || ''}</div>
           </div>
-          <div class="score-badge ${colorCls(r.score)}">${r.score}</div>
+          <div class="score-badge ${colorCls(r.avgScore)}">${r.avgScore}</div>
           <span class="outcome-tag tag-${r.outcome}">${formatOutcome(r.outcome)}</span>
           ${miniHtml}
-          <button class="lb-remove" onclick="removeRep(${origIdx})">✕</button>
+          <button class="lb-remove" onclick="removeRep('${r.rep}')">✕</button>
         </div>`;
     }).join('')}</div>`;
   }
 
-  async function removeRep(idx) {
-    const entry = leaderboardData[idx];
-    try {
-      await fetch(`${BACKEND}/sheet`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rep: entry.rep, timestamp: entry.time })
-      });
-    } catch (err) {
-      console.warn('Could not delete from sheet:', err.message);
+  async function removeRep(repName) {
+    const entries = leaderboardData.filter(r => r.rep.toLowerCase() === repName.toLowerCase());
+    for (const entry of entries) {
+      try {
+        await fetch(`${BACKEND}/sheet`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rep: entry.rep, timestamp: entry.time })
+        });
+      } catch (err) {
+        console.warn('Could not delete from sheet:', err.message);
+      }
     }
-    leaderboardData.splice(idx, 1);
+    leaderboardData = leaderboardData.filter(r => r.rep.toLowerCase() !== repName.toLowerCase());
     saveLeaderboard();
     updateBoardCount();
     renderLeaderboard();
