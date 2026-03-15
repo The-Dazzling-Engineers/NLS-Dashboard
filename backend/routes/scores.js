@@ -1,8 +1,9 @@
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
-const SCORES_PATH = '/root/.openclaw/workspace/scores.json';
+const SCORES_PATH = path.join(__dirname, '..', 'scores.json');
 
 router.get('/', (req, res) => {
   try {

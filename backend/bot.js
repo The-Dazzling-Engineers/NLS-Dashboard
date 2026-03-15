@@ -11,12 +11,6 @@ Your job:
 - Draft messages in Ali's voice — direct, warm, no fluff
 - Be concise. No filler. No "Great question!"
 
-Business metrics to know:
-- L = Leads (goal: 50/day)
-- OB = Offer Breaks / calls booked (goal: 36/day)
-- CL = Closes (goal: 18/day)
-- Close rate goal: 50%
-- Daily revenue target: $20k
 
 Anyone scoring below 60 needs mandatory coaching review.`;
 
@@ -43,7 +37,8 @@ async function askClaude(userMessage) {
 }
 
 const fs = require('fs');
-const SCORES_PATH = '/root/.openclaw/workspace/scores.json';
+const path = require('path');
+const SCORES_PATH = path.join(__dirname, 'scores.json');
 
 function getScores() {
   if (!fs.existsSync(SCORES_PATH)) return [];

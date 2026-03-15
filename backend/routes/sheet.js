@@ -6,7 +6,7 @@ const fs = require('fs');
 const router = express.Router();
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, '..', 'google-credentials.json'),
+  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -29,8 +29,8 @@ router.post('/', async (req, res) => {
       },
     });
 
-    // Write scores cache for OpenClaw to read
-    const scoresPath = '/root/.openclaw/workspace/scores.json';
+    // Write scores cache
+    const scoresPath = path.join(__dirname, '..', 'scores.json');
     let scores = [];
     if (fs.existsSync(scoresPath)) {
       scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
@@ -76,7 +76,7 @@ router.delete('/', async (req, res) => {
     });
 
     // Update scores cache
-    const scoresPath = '/root/.openclaw/workspace/scores.json';
+    const scoresPath = path.join(__dirname, '..', 'scores.json');
     if (fs.existsSync(scoresPath)) {
       let scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
       scores = scores.filter(s => !(s.rep === rep && s.timestamp === timestamp));

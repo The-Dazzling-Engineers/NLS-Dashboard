@@ -25,6 +25,6 @@ app.post('/bot', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  if (process.env.TUNNEL_URL) registerWebhook(process.env.TUNNEL_URL);
+  if (process.env.APP_URL) registerWebhook(process.env.APP_URL);
   scheduleEOD();
 });
