@@ -868,6 +868,22 @@
       <div class="stat-val color-amber" id="statTop">—</div>
       <div class="stat-lbl">Top Rep</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-val color-green" id="statClosed">0</div>
+      <div class="stat-lbl">Closes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val color-red" id="statNoSale">0</div>
+      <div class="stat-lbl">No Sales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statNoShow">0</div>
+      <div class="stat-lbl">No Shows</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statFollowUp">0</div>
+      <div class="stat-lbl">Follow Ups</div>
+    </div>
   </div>
 
   <!-- Manual add -->
@@ -1148,9 +1164,13 @@ ${lines}
     // Stats
     const avg = Math.round(grouped.reduce((a, r) => a + r.avgScore, 0) / grouped.length);
     const top = [...grouped].sort((a, b) => b.avgScore - a.avgScore)[0];
-    document.getElementById('statTotal').textContent = leaderboardData.length;
-    document.getElementById('statAvg').textContent   = avg;
-    document.getElementById('statTop').textContent   = top.rep;
+    document.getElementById('statTotal').textContent   = leaderboardData.length;
+    document.getElementById('statAvg').textContent     = avg;
+    document.getElementById('statTop').textContent     = top.rep;
+    document.getElementById('statClosed').textContent  = leaderboardData.filter(r => r.outcome === 'closed').length;
+    document.getElementById('statNoSale').textContent  = leaderboardData.filter(r => r.outcome === 'no_sale').length;
+    document.getElementById('statNoShow').textContent  = leaderboardData.filter(r => r.outcome === 'no_show').length;
+    document.getElementById('statFollowUp').textContent = leaderboardData.filter(r => r.outcome === 'follow_up').length;
 
     const sorted = [...grouped].sort((a, b) => b.avgScore - a.avgScore);
 

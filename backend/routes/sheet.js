@@ -37,7 +37,18 @@ router.post('/', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     const { rows } = await getSheet(sheets);
 
-    const rowIndex = rows.findIndex(r => r[0] && r[0].toLowerCase() === rep.toLowerCase());
+    // Add header row if sheet is empty
+    if (rows.length === 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+        range: RANGE,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [['Rep', 'Calls', 'Avg Score', 'Closed', 'No Sale', 'No Show', 'Follow Up', 'Not Qualified', 'Last Updated']] },
+      });
+      rows.push(['Rep', 'Calls', 'Avg Score', 'Closed', 'No Sale', 'No Show', 'Follow Up', 'Not Qualified', 'Last Updated']);
+    }
+
+    const rowIndex = rows.findIndex(r => r[0] && r[0].toLowerCase() === rep.toLowerCase() && r[0].toLowerCase() !== 'rep');
     const outcomeKey = (outcome || 'no_sale').toLowerCase().replace(' ', '_');
 
     if (rowIndex === -1) {
