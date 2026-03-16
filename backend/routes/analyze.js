@@ -41,7 +41,7 @@ router.post('/', async (req, res) => {
   try {
     const message = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 512,
       system: SYSTEM_PROMPT,
       messages: [
         {
