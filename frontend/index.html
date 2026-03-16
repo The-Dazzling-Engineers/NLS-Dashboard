@@ -1101,6 +1101,9 @@ ${lines}
 
     if (!leaderboardData.length) {
       list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>No reps logged yet.</p></div>`;
+      document.getElementById('statTotal').textContent = 0;
+      document.getElementById('statAvg').textContent   = '—';
+      document.getElementById('statTop').textContent   = '—';
       return;
     }
 
