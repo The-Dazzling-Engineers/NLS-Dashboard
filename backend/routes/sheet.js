@@ -10,10 +10,9 @@ const auth = new google.auth.GoogleAuth({
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
-const RANGE = 'Sheet1!A:I';
-const OUTCOMES = ['closed', 'no_sale', 'no_show', 'follow_up', 'not_qualified'];
+const RANGE = 'Sheet1!A:F';
+const HEADERS = ['Rep', 'Calls', 'Avg Hit Rate', 'Total Hits', 'Total Possible', 'Last Updated'];
 
-// Read all rows, return { rows, sheetId }
 async function getSheet(sheets) {
   const [dataRes, metaRes] = await Promise.all([
     sheets.spreadsheets.values.get({ spreadsheetId: process.env.GOOGLE_SHEETS_ID, range: RANGE }),
@@ -27,54 +26,47 @@ async function getSheet(sheets) {
 
 // POST /sheet — upsert rep row
 router.post('/', async (req, res) => {
-  const { rep, score, timestamp, outcome } = req.body;
+  const { rep, hit, total, timestamp } = req.body;
 
-  if (!rep || score === undefined || !timestamp) {
-    return res.status(400).json({ error: 'rep, score, and timestamp are required' });
+  if (!rep || hit === undefined || !timestamp) {
+    return res.status(400).json({ error: 'rep, hit, and timestamp are required' });
   }
 
   try {
     const sheets = google.sheets({ version: 'v4', auth });
     const { rows } = await getSheet(sheets);
 
-    // Add header row if sheet is empty
     if (rows.length === 0) {
       await sheets.spreadsheets.values.append({
         spreadsheetId: process.env.GOOGLE_SHEETS_ID,
         range: RANGE,
         valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [['Rep', 'Calls', 'Avg Score', 'Closed', 'No Sale', 'No Show', 'Follow Up', 'Not Qualified', 'Last Updated']] },
+        requestBody: { values: [HEADERS] },
       });
-      rows.push(['Rep', 'Calls', 'Avg Score', 'Closed', 'No Sale', 'No Show', 'Follow Up', 'Not Qualified', 'Last Updated']);
+      rows.push(HEADERS);
     }
 
     const rowIndex = rows.findIndex(r => r[0] && r[0].toLowerCase() === rep.toLowerCase() && r[0].toLowerCase() !== 'rep');
-    const outcomeKey = (outcome || 'no_sale').toLowerCase().replace(' ', '_');
 
     if (rowIndex === -1) {
-      // New rep — append row: Rep | Calls | Avg | Closed | No Sale | No Show | Follow Up | Not Qualified | Last Updated
-      const outcomeCounts = OUTCOMES.map(o => (o === outcomeKey ? 1 : 0));
+      const hitRate = `${hit}/${total || 5}`;
       await sheets.spreadsheets.values.append({
         spreadsheetId: process.env.GOOGLE_SHEETS_ID,
         range: RANGE,
         valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [[rep, 1, score, ...outcomeCounts, timestamp]] },
+        requestBody: { values: [[rep, 1, hitRate, hit, total || 5, timestamp]] },
       });
     } else {
-      // Existing rep — update counts
       const r = rows[rowIndex];
       const calls = parseInt(r[1] || 0) + 1;
-      const prevAvg = parseFloat(r[2] || 0);
-      const newAvg = Math.round((prevAvg * (calls - 1) + score) / calls);
-      const outcomeCounts = OUTCOMES.map((o, i) => {
-        const current = parseInt(r[3 + i] || 0);
-        return o === outcomeKey ? current + 1 : current;
-      });
+      const totalHits = parseInt(r[3] || 0) + hit;
+      const totalPossible = parseInt(r[4] || 0) + (total || 5);
+      const hitRate = `${totalHits}/${totalPossible}`;
       await sheets.spreadsheets.values.update({
         spreadsheetId: process.env.GOOGLE_SHEETS_ID,
-        range: `Sheet1!A${rowIndex + 1}:I${rowIndex + 1}`,
+        range: `Sheet1!A${rowIndex + 1}:F${rowIndex + 1}`,
         valueInputOption: 'USER_ENTERED',
-        requestBody: { values: [[rep, calls, newAvg, ...outcomeCounts, timestamp]] },
+        requestBody: { values: [[rep, calls, hitRate, totalHits, totalPossible, timestamp]] },
       });
     }
 
@@ -82,7 +74,7 @@ router.post('/', async (req, res) => {
     const scoresPath = path.join(__dirname, '..', 'scores.json');
     let scores = [];
     if (fs.existsSync(scoresPath)) scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
-    scores.push({ rep, score, outcome: outcomeKey, timestamp });
+    scores.push({ rep, hit, total: total || 5, timestamp });
     fs.writeFileSync(scoresPath, JSON.stringify(scores, null, 2));
 
     res.json({ success: true });
@@ -102,7 +94,7 @@ router.delete('/', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     const { rows, sheetId } = await getSheet(sheets);
 
-    const rowIndex = rows.findIndex(r => r[0] && r[0].toLowerCase() === rep.toLowerCase());
+    const rowIndex = rows.findIndex(r => r[0] && r[0].toLowerCase() === rep.toLowerCase() && r[0].toLowerCase() !== 'rep');
 
     if (rowIndex !== -1) {
       await sheets.spreadsheets.batchUpdate({
@@ -113,7 +105,6 @@ router.delete('/', async (req, res) => {
       });
     }
 
-    // Update scores cache
     const scoresPath = path.join(__dirname, '..', 'scores.json');
     if (fs.existsSync(scoresPath)) {
       let scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));

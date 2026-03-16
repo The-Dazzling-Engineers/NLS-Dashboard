@@ -756,16 +756,6 @@
           <label>Rep Name</label>
           <input type="text" id="repName" placeholder="e.g. Tyler Durden" required />
         </div>
-        <div class="form-group">
-          <label>Call Outcome</label>
-          <select id="outcome">
-            <option value="closed">Closed</option>
-            <option value="follow_up">Follow Up</option>
-            <option value="no_sale">No Sale</option>
-            <option value="no_show">No Show</option>
-            <option value="not_qualified">Not Qualified</option>
-          </select>
-        </div>
       </div>
 
       <div class="form-group">
@@ -862,42 +852,18 @@
     </div>
     <div class="stat-card">
       <div class="stat-val color-green" id="statAvg">—</div>
-      <div class="stat-lbl">Avg Score</div>
+      <div class="stat-lbl">Avg Hit Rate</div>
     </div>
     <div class="stat-card">
       <div class="stat-val color-amber" id="statTop">—</div>
       <div class="stat-lbl">Top Rep</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val color-green" id="statClosed">0</div>
-      <div class="stat-lbl">Closes</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val color-red" id="statNoSale">0</div>
-      <div class="stat-lbl">No Sales</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="statNoShow">0</div>
-      <div class="stat-lbl">No Shows</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="statFollowUp">0</div>
-      <div class="stat-lbl">Follow Ups</div>
     </div>
   </div>
 
   <!-- Manual add -->
   <div class="eod-top">
     <input type="text" id="eodRep" placeholder="First and last name" />
-    <input type="text" id="eodScore" placeholder="Score (0–100)" style="max-width:130px;" />
-    <select id="eodOutcome" style="max-width:160px;">
-      <option value="">Outcome…</option>
-      <option value="closed">Closed</option>
-      <option value="follow_up">Follow Up</option>
-      <option value="no_sale">No Sale</option>
-      <option value="no_show">No Show</option>
-      <option value="not_qualified">Not Qualified</option>
-    </select>
+    <input type="text" id="eodHit" placeholder="Criteria hit (0–5)" style="max-width:150px;" />
     <button class="btn btn-ghost" onclick="addRepToBoard()">Add Rep</button>
   </div>
 
@@ -921,7 +887,7 @@
 <div id="toast"></div>
 
 <script>
-  const BACKEND = 'http://167.99.120.81:3000';
+  const BACKEND = 'https://nls-dashboard-production.up.railway.app';
   const CIRC = 2 * Math.PI * 33; // SVG ring circumference
 
   let lastResult = null;
@@ -957,7 +923,7 @@
       const existing = new Set(leaderboardData.map(r => r.rep + r.time));
       scores.forEach(s => {
         if (!existing.has(s.rep + s.timestamp)) {
-          leaderboardData.push({ rep: s.rep, score: s.score, outcome: 'closed', criteria: [], time: s.timestamp });
+          leaderboardData.push({ rep: s.rep, hit: s.hit || 0, total: s.total || 5, criteria: [], time: s.timestamp });
         }
       });
       saveLeaderboard();
@@ -993,7 +959,6 @@
   async function submitAnalysis(e) {
     e.preventDefault();
     const rep        = document.getElementById('repName').value.trim();
-    const outcome    = document.getElementById('outcome').value;
     const transcript = document.getElementById('transcript').value.trim();
     const btn        = document.getElementById('analyzeBtn');
 
@@ -1004,12 +969,12 @@
       const res = await fetch(`${BACKEND}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rep, outcome, transcript })
+        body: JSON.stringify({ rep, transcript })
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
 
-      lastResult = { rep, outcome, timestamp: new Date().toLocaleString(), ...data };
+      lastResult = { rep, timestamp: new Date().toLocaleString(), ...data };
       renderResults(lastResult);
       addToLeaderboard(lastResult);
       logToSheet();
@@ -1023,35 +988,34 @@
 
   // ── RENDER RESULTS ──
   function renderResults(r) {
-    const s = r.overall;
+    const hit = r.hit || 0;
+    const total = r.total || 5;
+    const pct = Math.round((hit / total) * 100);
 
     // Ring
     const fg = document.getElementById('ringFg');
-    const filled = (s / 100) * CIRC;
+    const filled = (pct / 100) * CIRC;
     fg.style.strokeDasharray = `${filled} ${CIRC}`;
-    fg.className = `ring-fg ${s >= 75 ? 'ring-fg-green' : s >= 50 ? 'ring-fg-amber' : 'ring-fg-red'}`;
+    fg.className = `ring-fg ${pct >= 80 ? 'ring-fg-green' : pct >= 60 ? 'ring-fg-amber' : 'ring-fg-red'}`;
 
     const num = document.getElementById('overallNum');
-    num.textContent = s;
-    num.className = `score-ring-num ${colorCls(s)}`;
+    num.textContent = `${hit}/${total}`;
+    num.className = `score-ring-num ${pct >= 80 ? 'color-green' : pct >= 60 ? 'color-amber' : 'color-red'}`;
 
     document.getElementById('resultRep').textContent  = r.rep;
     document.getElementById('resultTime').textContent = r.timestamp;
 
     const chip = document.getElementById('resultOutcomeChip');
-    chip.textContent = formatOutcome(r.outcome);
-    chip.className   = `meta-chip outcome-${r.outcome}`;
+    chip.textContent = `${hit}/${total} criteria`;
+    chip.className   = `meta-chip`;
 
-    // Criteria
+    // Criteria yes/no
     const grid = document.getElementById('criteriaGrid');
     grid.innerHTML = (r.criteria || []).map(c => `
       <div class="criterion">
         <div class="criterion-top">
           <span class="criterion-name">${c.name}</span>
-          <span class="criterion-score ${colorCls(c.score * 10)}">${c.score}<span style="font-size:11px;font-weight:500;color:var(--muted)">/10</span></span>
-        </div>
-        <div class="bar-track">
-          <div class="bar-fill ${barCls(c.score)}" style="width:${c.score * 10}%"></div>
+          <span style="font-size:18px">${c.hit ? '✅' : '❌'}</span>
         </div>
       </div>`).join('');
 
@@ -1067,14 +1031,13 @@
   async function sendToTelegram() {
     if (!lastResult) return;
     const r = lastResult;
-    const lines = (r.criteria || []).map(c => `  • ${c.name}: ${c.score}/10`).join('\n');
+    const lines = (r.criteria || []).map(c => `  ${c.hit ? '✅' : '❌'} ${c.name}`).join('\n');
     const msg =
 `📞 *Call QC — ${r.rep}*
-📅 ${r.timestamp} · ${formatOutcome(r.outcome)}
+📅 ${r.timestamp}
 
-*Overall: ${r.overall}/100*
+*Criteria: ${r.hit}/${r.total}*
 
-*Breakdown:*
 ${lines}
 
 ✅ *Strengths:* ${r.strengths}
@@ -1093,7 +1056,7 @@ ${lines}
       const res = await fetch(`${BACKEND}/sheet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rep: lastResult.rep, score: lastResult.overall, timestamp: lastResult.timestamp, outcome: lastResult.outcome })
+        body: JSON.stringify({ rep: lastResult.rep, hit: lastResult.hit, total: lastResult.total, timestamp: lastResult.timestamp })
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       showToast('Logged to Google Sheets ✓', 'success');
@@ -1104,30 +1067,27 @@ ${lines}
 
   // ── LEADERBOARD ──
   function addToLeaderboard(r) {
-    leaderboardData.push({ rep: r.rep, score: r.overall, outcome: r.outcome, criteria: r.criteria || [], time: r.timestamp });
+    leaderboardData.push({ rep: r.rep, hit: r.hit, total: r.total || 5, criteria: r.criteria || [], time: r.timestamp });
     saveLeaderboard();
     updateBoardCount();
   }
 
   function addRepToBoard() {
-    const rep     = document.getElementById('eodRep').value.trim();
-    const score   = parseInt(document.getElementById('eodScore').value);
-    const outcome = document.getElementById('eodOutcome').value;
-    if (!rep || isNaN(score)) { showToast('Enter rep name and score', 'error'); return; }
+    const rep = document.getElementById('eodRep').value.trim();
+    const hit = parseInt(document.getElementById('eodHit').value);
+    if (!rep || isNaN(hit) || hit < 0 || hit > 5) { showToast('Enter rep name and criteria hit (0-5)', 'error'); return; }
     const existing = leaderboardData.findIndex(r => r.rep.toLowerCase() === rep.toLowerCase());
     if (existing !== -1) {
-      leaderboardData[existing].score = score;
-      leaderboardData[existing].outcome = outcome || leaderboardData[existing].outcome;
+      leaderboardData[existing].hit = hit;
       leaderboardData[existing].time = new Date().toLocaleString();
     } else {
-      leaderboardData.push({ rep, score, outcome: outcome || 'no_sale', criteria: [], time: new Date().toLocaleString() });
+      leaderboardData.push({ rep, hit, total: 5, criteria: [], time: new Date().toLocaleString() });
     }
     saveLeaderboard();
     updateBoardCount();
     renderLeaderboard();
     document.getElementById('eodRep').value = '';
-    document.getElementById('eodScore').value = '';
-    document.getElementById('eodOutcome').value = '';
+    document.getElementById('eodHit').value = '';
   }
 
   function saveLeaderboard() { localStorage.setItem('nls_leaderboard', JSON.stringify(leaderboardData)); }
@@ -1154,29 +1114,22 @@ ${lines}
 
     const grouped = Object.values(groups).map(g => ({
       rep: g.rep,
-      avgScore: Math.round(g.entries.reduce((a, e) => a + e.score, 0) / g.entries.length),
+      totalHit: g.entries.reduce((a, e) => a + (e.hit || 0), 0),
+      totalPossible: g.entries.reduce((a, e) => a + (e.total || 5), 0),
       callCount: g.entries.length,
-      closed: g.entries.filter(e => e.outcome === 'closed').length,
-      noSale: g.entries.filter(e => e.outcome === 'no_sale').length,
-      noShow: g.entries.filter(e => e.outcome === 'no_show').length,
-      followUp: g.entries.filter(e => e.outcome === 'follow_up').length,
-      outcome: g.entries[g.entries.length - 1].outcome,
       criteria: g.entries[g.entries.length - 1].criteria || [],
       time: g.entries[g.entries.length - 1].time || '',
     }));
 
     // Stats
-    const avg = Math.round(grouped.reduce((a, r) => a + r.avgScore, 0) / grouped.length);
-    const top = [...grouped].sort((a, b) => b.avgScore - a.avgScore)[0];
-    document.getElementById('statTotal').textContent   = leaderboardData.length;
-    document.getElementById('statAvg').textContent     = avg;
-    document.getElementById('statTop').textContent     = top.rep;
-    document.getElementById('statClosed').textContent  = leaderboardData.filter(r => r.outcome === 'closed').length;
-    document.getElementById('statNoSale').textContent  = leaderboardData.filter(r => r.outcome === 'no_sale').length;
-    document.getElementById('statNoShow').textContent  = leaderboardData.filter(r => r.outcome === 'no_show').length;
-    document.getElementById('statFollowUp').textContent = leaderboardData.filter(r => r.outcome === 'follow_up').length;
+    const totalHits = leaderboardData.reduce((a, r) => a + (r.hit || 0), 0);
+    const totalPossible = leaderboardData.reduce((a, r) => a + (r.total || 5), 0);
+    const top = [...grouped].sort((a, b) => (b.totalHit / b.totalPossible) - (a.totalHit / a.totalPossible))[0];
+    document.getElementById('statTotal').textContent = leaderboardData.length;
+    document.getElementById('statAvg').textContent   = totalPossible ? `${totalHits}/${totalPossible}` : '—';
+    document.getElementById('statTop').textContent   = top ? top.rep : '—';
 
-    const sorted = [...grouped].sort((a, b) => b.avgScore - a.avgScore);
+    const sorted = [...grouped].sort((a, b) => (b.totalHit / b.totalPossible) - (a.totalHit / a.totalPossible));
 
     list.innerHTML = `<div class="lb-list">${sorted.map((r, i) => {
       const rank  = i + 1;
@@ -1186,13 +1139,11 @@ ${lines}
         : `<div class="lb-rank rn">${rank}</div>`;
 
       const topCls = rank <= 3 ? ` top-${rank}` : '';
+      const pct = Math.round((r.totalHit / r.totalPossible) * 100);
 
-      const miniHtml = r.criteria.length
-        ? `<div class="mini-bars">${r.criteria.map(c => {
-            const h = Math.max(4, Math.round(c.score / 10 * 20));
-            return `<div class="mini-bar ${barCls(c.score)}" style="height:${h}px" title="${c.name}: ${c.score}/10"></div>`;
-          }).join('')}</div>`
-        : `<span style="color:var(--border2);font-size:12px">—</span>`;
+      const criteriaHtml = r.criteria.length
+        ? r.criteria.map(c => `<span style="font-size:14px" title="${c.name}">${c.hit ? '✅' : '❌'}</span>`).join('')
+        : '—';
 
       return `
         <div class="lb-row${topCls}">
@@ -1201,14 +1152,8 @@ ${lines}
             <div class="lb-name">${r.rep} <span style="font-size:11px;color:var(--text2)">(${r.callCount} call${r.callCount > 1 ? 's' : ''})</span></div>
             <div class="lb-time">${r.time || ''}</div>
           </div>
-          <div class="score-badge ${colorCls(r.avgScore)}">${r.avgScore}</div>
-          <div style="display:flex;gap:4px;flex-wrap:wrap">
-            ${r.closed  ? `<span class="outcome-tag tag-closed">${r.closed} Close${r.closed > 1 ? 's' : ''}</span>` : ''}
-            ${r.noSale  ? `<span class="outcome-tag tag-no_sale">${r.noSale} No Sale${r.noSale > 1 ? 's' : ''}</span>` : ''}
-            ${r.noShow  ? `<span class="outcome-tag tag-no_show">${r.noShow} No Show${r.noShow > 1 ? 's' : ''}</span>` : ''}
-            ${r.followUp ? `<span class="outcome-tag tag-follow_up">${r.followUp} Follow Up${r.followUp > 1 ? 's' : ''}</span>` : ''}
-          </div>
-          ${miniHtml}
+          <div class="score-badge ${pct >= 80 ? 'color-green' : pct >= 60 ? 'color-amber' : 'color-red'}" style="font-size:14px;min-width:50px">${r.totalHit}/${r.totalPossible}</div>
+          <div style="display:flex;gap:2px;align-items:center">${criteriaHtml}</div>
           <button class="lb-remove" onclick="removeRep('${r.rep}')">✕</button>
         </div>`;
     }).join('')}</div>`;
@@ -1236,21 +1181,32 @@ ${lines}
   // ── SEND EOD ──
   async function sendEOD() {
     if (!leaderboardData.length) { showToast('No reps on the board', 'error'); return; }
-    const date   = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
-    const sorted = [...leaderboardData].sort((a, b) => b.score - a.score);
-    const lines  = sorted.map((r, i) => {
+    const date = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+
+    const groups = {};
+    leaderboardData.forEach(r => {
+      const key = r.rep.toLowerCase();
+      if (!groups[key]) groups[key] = { rep: r.rep, hit: 0, total: 0, calls: 0 };
+      groups[key].hit += r.hit || 0;
+      groups[key].total += r.total || 5;
+      groups[key].calls += 1;
+    });
+
+    const sorted = Object.values(groups).sort((a, b) => (b.hit / b.total) - (a.hit / a.total));
+    const lines = sorted.map((r, i) => {
       const m = ['🥇','🥈','🥉'][i] || `${i+1}.`;
-      return `${m} ${r.rep} — ${r.score}/100 (${formatOutcome(r.outcome)})`;
+      return `${m} ${r.rep} — ${r.hit}/${r.total} (${r.calls} call${r.calls > 1 ? 's' : ''})`;
     }).join('\n');
 
-    const avg = Math.round(sorted.reduce((a, r) => a + r.score, 0) / sorted.length);
+    const totalHit = leaderboardData.reduce((a, r) => a + (r.hit || 0), 0);
+    const totalPossible = leaderboardData.reduce((a, r) => a + (r.total || 5), 0);
 
     const msg =
 `🏆 *EOD Leaderboard — ${date}*
 
 ${lines}
 
-📊 Calls reviewed: ${sorted.length} · Avg score: ${avg}/100`;
+📊 ${leaderboardData.length} calls · ${totalHit}/${totalPossible} criteria hit`;
 
     await postTelegram(msg);
   }

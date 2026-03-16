@@ -20,7 +20,7 @@ async function askClaude(userMessage) {
     const scores = await getScores();
     if (scores.length) {
       const sorted = [...scores].sort((a, b) => b.score - a.score);
-      const lines = sorted.map((s, i) => `${i + 1}. ${s.rep} - ${s.score} (${s.timestamp})`).join('\n');
+      const lines = sorted.map((s, i) => `${i + 1}. ${s.rep} - ${s.hit}/${s.total || 5} criteria hit (${s.timestamp})`).join('\n');
       systemWithData += `\n\nCurrent leaderboard data:\n${lines}`;
     }
   } catch (err) {
@@ -52,33 +52,26 @@ function formatLeaderboard(scores) {
   const groups = {};
   scores.forEach(s => {
     const key = s.rep.toLowerCase();
-    if (!groups[key]) groups[key] = { rep: s.rep, scores: [], outcomes: {} };
-    groups[key].scores.push(s.score);
-    const o = s.outcome || 'no_sale';
-    groups[key].outcomes[o] = (groups[key].outcomes[o] || 0) + 1;
+    if (!groups[key]) groups[key] = { rep: s.rep, hits: 0, possible: 0, calls: 0 };
+    groups[key].hits += s.hit || 0;
+    groups[key].possible += s.total || 5;
+    groups[key].calls += 1;
   });
 
-  const reps = Object.values(groups).map(g => ({
-    rep: g.rep,
-    avg: Math.round(g.scores.reduce((a, b) => a + b, 0) / g.scores.length),
-    calls: g.scores.length,
-    outcomes: g.outcomes,
-  })).sort((a, b) => b.avg - a.avg);
+  const reps = Object.values(groups)
+    .sort((a, b) => (b.hits / b.possible) - (a.hits / a.possible));
 
   const medals = ['🥇', '🥈', '🥉'];
   const lines = reps.map((r, i) => {
     const rank = medals[i] || `${i + 1}.`;
-    const outcomeStr = Object.entries(r.outcomes)
-      .map(([k, v]) => `${v} ${k.replace('_', ' ')}`)
-      .join(', ');
-    return `${rank} ${r.rep} — ${r.avg}/100 (${r.calls} call${r.calls > 1 ? 's' : ''}: ${outcomeStr})`;
+    return `${rank} ${r.rep} — ${r.hits}/${r.possible} (${r.calls} call${r.calls > 1 ? 's' : ''})`;
   });
 
-  const total = scores.length;
-  const closes = scores.filter(s => s.outcome === 'closed').length;
-  const avgAll = Math.round(scores.reduce((a, s) => a + s.score, 0) / total);
+  const totalCalls = scores.length;
+  const totalHits = scores.reduce((a, s) => a + (s.hit || 0), 0);
+  const totalPossible = scores.reduce((a, s) => a + (s.total || 5), 0);
 
-  return `🏆 NLS Leaderboard\n\n${lines.join('\n')}\n\n📊 ${total} calls · ${closes} closes · ${avgAll} avg score`;
+  return `🏆 NLS Leaderboard\n\n${lines.join('\n')}\n\n📊 ${totalCalls} calls · ${totalHits}/${totalPossible} criteria hit`;
 }
 
 async function sendToChat(chatId, text) {
