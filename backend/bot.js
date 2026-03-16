@@ -19,8 +19,8 @@ async function askClaude(userMessage) {
   try {
     const scores = await getScores();
     if (scores.length) {
-      const sorted = [...scores].sort((a, b) => b.score - a.score);
-      const lines = sorted.map((s, i) => `${i + 1}. ${s.rep} - ${s.hit}/${s.total || 5} criteria hit (${s.timestamp})`).join('\n');
+      const sorted = [...scores].sort((a, b) => (b.totalHits / b.totalPossible) - (a.totalHits / a.totalPossible));
+      const lines = sorted.map((s, i) => `${i + 1}. ${s.rep} - ${s.totalHits}/${s.totalPossible} criteria hit (${s.calls} calls)`).join('\n');
       systemWithData += `\n\nCurrent leaderboard data:\n${lines}`;
     }
   } catch (err) {
@@ -36,40 +36,43 @@ async function askClaude(userMessage) {
   return response.content[0].text;
 }
 
-const fs = require('fs');
-const path = require('path');
-const SCORES_PATH = path.join(__dirname, 'scores.json');
+const { google } = require('googleapis');
 
-function getScores() {
-  if (!fs.existsSync(SCORES_PATH)) return [];
-  return JSON.parse(fs.readFileSync(SCORES_PATH, 'utf8'));
+const auth = new google.auth.GoogleAuth({
+  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+async function getScores() {
+  const sheets = google.sheets({ version: 'v4', auth });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+    range: 'Sheet1!A:F',
+  });
+  const rows = res.data.values || [];
+  // Skip header row, return rep data
+  return rows.slice(1).filter(r => r[0]).map(r => ({
+    rep: r[0],
+    calls: parseInt(r[1] || 0),
+    totalHits: parseInt(r[3] || 0),
+    totalPossible: parseInt(r[4] || 0),
+  }));
 }
 
 function formatLeaderboard(scores) {
   if (!scores.length) return 'No scores logged yet.';
 
-  // Group by rep
-  const groups = {};
-  scores.forEach(s => {
-    const key = s.rep.toLowerCase();
-    if (!groups[key]) groups[key] = { rep: s.rep, hits: 0, possible: 0, calls: 0 };
-    groups[key].hits += s.hit || 0;
-    groups[key].possible += s.total || 5;
-    groups[key].calls += 1;
-  });
-
-  const reps = Object.values(groups)
-    .sort((a, b) => (b.hits / b.possible) - (a.hits / a.possible));
+  const sorted = [...scores].sort((a, b) => (b.totalHits / b.totalPossible) - (a.totalHits / a.totalPossible));
 
   const medals = ['🥇', '🥈', '🥉'];
-  const lines = reps.map((r, i) => {
+  const lines = sorted.map((r, i) => {
     const rank = medals[i] || `${i + 1}.`;
-    return `${rank} ${r.rep} — ${r.hits}/${r.possible} (${r.calls} call${r.calls > 1 ? 's' : ''})`;
+    return `${rank} ${r.rep} — ${r.totalHits}/${r.totalPossible} (${r.calls} call${r.calls > 1 ? 's' : ''})`;
   });
 
-  const totalCalls = scores.length;
-  const totalHits = scores.reduce((a, s) => a + (s.hit || 0), 0);
-  const totalPossible = scores.reduce((a, s) => a + (s.total || 5), 0);
+  const totalCalls = scores.reduce((a, s) => a + s.calls, 0);
+  const totalHits = scores.reduce((a, s) => a + s.totalHits, 0);
+  const totalPossible = scores.reduce((a, s) => a + s.totalPossible, 0);
 
   return `🏆 NLS Leaderboard\n\n${lines.join('\n')}\n\n📊 ${totalCalls} calls · ${totalHits}/${totalPossible} criteria hit`;
 }
