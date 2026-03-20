@@ -1,9 +1,9 @@
 const express = require('express');
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 
 const router = express.Router();
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = 'claude-sonnet-4-20250514';
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const MODEL = 'ft:gpt-4o-mini-2024-07-18:next-level-systems::DLI3V5SA';
 
 const SYSTEM_PROMPT = `You are a sales call quality analyst for Next Level Systems, which sells an ADHD life optimizer service.
 
@@ -39,19 +39,16 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const message = await client.messages.create({
+    const completion = await client.chat.completions.create({
       model: MODEL,
       max_tokens: 512,
-      system: SYSTEM_PROMPT,
       messages: [
-        {
-          role: 'user',
-          content: `Rep: ${rep}\n\nTranscript:\n${transcript}`,
-        },
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Rep: ${rep}\n\nTranscript:\n${transcript}` },
       ],
     });
 
-    const scored = JSON.parse(message.content[0].text);
+    const scored = JSON.parse(completion.choices[0].message.content);
     res.json(scored);
   } catch (err) {
     console.error('analyze error:', err);
