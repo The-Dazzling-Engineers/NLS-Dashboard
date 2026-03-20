@@ -10,7 +10,7 @@ const { handleUpdate, registerWebhook, scheduleEOD } = require('./bot');
 
 const app = express();
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.use('/analyze', analyzeRoute);
 app.use('/sheet', sheetRoute);
